@@ -147,14 +147,30 @@ void __time_critical_func(picostation::MechCommand::processLatchedCommand)()
 				case CLV_MODE_STOP:
 					setSens(SENS::GFS, false);
 					m_i2s.i2s_set_state(0);
+					
+					if (isCLVModeStopKickPattern())
+					{
+						g_driveMechanics.setSector(-1, 1);
+						resetCLVModeStopKickPattern();
+					}
+					else
+					{
+						setCLVModeStopKickPattern(1 << 0);
+					}
+					
 					DEBUG_PRINT("Stop\n");
 					break;
 				
 				case CLV_MODE_BRAKE:
+					resetCLVModeStopKickPattern();
 					DEBUG_PRINT("Brake\n");
 					break;
 					
 				case CLV_MODE_KICK:
+					if ((getCLVModeStopKickPattern() & 0b0001) == 0b0001)
+					{
+						setCLVModeStopKickPattern(1 << 1);
+					}
 					DEBUG_PRINT("Kick\n");
 					break;
 
@@ -163,6 +179,7 @@ void __time_critical_func(picostation::MechCommand::processLatchedCommand)()
 				case CLV_MODE_CLVH:
 				case CLV_MODE_CLVP:
 				case CLV_MODE_CLVA:
+					resetCLVModeStopKickPattern();
 					setSens(SENS::GFS, true);
 					m_i2s.i2s_set_state(1);
 					setSens(SENS::XBUSY, false);
@@ -272,6 +289,27 @@ void __time_critical_func(picostation::MechCommand::processLatchedCommand)()
 			break;
 	}
 }
+
+void __time_critical_func(picostation::MechCommand::setCLVModeStopKickPattern) (uint8_t clv_mode)
+{
+	m_clvModeStopKickPattern |= clv_mode;
+}
+
+bool __time_critical_func(picostation::MechCommand::isCLVModeStopKickPattern)()
+	{ 
+		if ((m_clvModeStopKickPattern & 0b0011) == 0b0011)
+		{
+			if (!m_firstClvModeStopKickPattern)
+			{
+				DEBUG_PRINT("ClvModeStopKickPattern\n");
+				return true;
+			}
+			
+			setFirstClvModeStopKickPattern(false);
+		}
+
+		return false;
+	};
 
 bool __time_critical_func(picostation::MechCommand::getSens)(const size_t what) const { return m_sensData[what]; }
 
